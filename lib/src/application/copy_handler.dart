@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart'
-    show BuildContext, ScaffoldMessenger, SnackBar, Text;
+    show BuildContext, ScaffoldMessenger, SnackBar, Text, TextAlign;
 
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_event.dart';
@@ -85,7 +85,10 @@ class CopyHandler {
     switch (feedback) {
       case SnackBarFeedback(:final text, :final duration):
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(text), duration: duration),
+          SnackBar(
+            content: Text(text, textAlign: TextAlign.center),
+            duration: duration,
+          ),
         );
       case CustomFeedback(:final onCopied):
         onCopied(context, event);

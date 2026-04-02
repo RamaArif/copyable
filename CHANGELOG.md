@@ -1,3 +1,9 @@
+## 1.0.1
+
+* Renamed package from `copyable` to `copyable_widget`
+* Fixed `Copyable.text` factory return type error
+* Centered SnackBar text
+
 ## 1.0.0
 
 * **Null safety**: this version opts into sound null safety (previous versions did not)

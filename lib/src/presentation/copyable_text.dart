@@ -1,12 +1,10 @@
-import 'dart:async';
-
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 
 import '../application/copy_handler.dart';
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_feedback.dart';
 import '../domain/models/haptic_feedback_style.dart';
+import '_clear_timer_mixin.dart';
 import 'copyable_theme.dart';
 
 /// A [Text] widget that copies its content to the clipboard on tap or
@@ -106,51 +104,36 @@ class CopyableText extends StatefulWidget {
   State<CopyableText> createState() => _CopyableTextState();
 }
 
-class _CopyableTextState extends State<CopyableText> {
-  Timer? _clearTimer;
-
-  @override
-  void dispose() {
-    _clearTimer?.cancel();
-    super.dispose();
-  }
+class _CopyableTextState extends State<CopyableText>
+    with ClearAfterMixin<CopyableText> {
+  bool _isCopying = false;
 
   Future<void> _handleCopy(BuildContext context) async {
-    final theme = CopyableTheme.of(context);
-    final resolvedMode = CopyableText._handler.resolveMode(widget.mode);
+    if (_isCopying) return;
+    _isCopying = true;
+    try {
+      final theme = CopyableTheme.of(context);
+      final resolvedMode = CopyableText._handler.resolveMode(widget.mode);
+      final resolvedFeedback =
+          CopyableText._handler.resolveFeedback(widget.feedback, theme);
 
-    // Resolve SnackBar text/duration from theme when not provided per-widget.
-    CopyableFeedback resolvedFeedback = widget.feedback;
-    if (widget.feedback is SnackBarFeedback) {
-      final snackFeedback = widget.feedback as SnackBarFeedback;
-      resolvedFeedback = SnackBarFeedback(
-        text: snackFeedback.text ?? theme.snackBarText,
-        duration: snackFeedback.duration ?? theme.snackBarDuration,
+      var copySucceeded = true;
+      await CopyableText._handler.handle(
+        context: context,
+        value: widget.value ?? widget.data,
+        resolvedMode: resolvedMode,
+        feedback: resolvedFeedback,
+        haptic: widget.haptic,
+        onError: (e) {
+          copySucceeded = false;
+          widget.onError?.call(e);
+        },
       );
-    }
 
-    var copySucceeded = true;
-    await CopyableText._handler.handle(
-      context: context,
-      value: widget.value ?? widget.data,
-      resolvedMode: resolvedMode,
-      feedback: resolvedFeedback,
-      haptic: widget.haptic,
-      onError: (e) {
-        copySucceeded = false;
-        widget.onError?.call(e);
-      },
-    );
-
-    if (!copySucceeded) return;
-
-    // Start clear timer only after a confirmed successful copy.
-    final resolvedClearAfter = widget.clearAfter ?? theme.clearAfter;
-    if (resolvedClearAfter != null) {
-      _clearTimer?.cancel();
-      _clearTimer = Timer(resolvedClearAfter, () {
-        Clipboard.setData(const ClipboardData(text: ''));
-      });
+      if (!copySucceeded) return;
+      startClearAfterTimer(widget.clearAfter ?? theme.clearAfter);
+    } finally {
+      _isCopying = false;
     }
   }
 

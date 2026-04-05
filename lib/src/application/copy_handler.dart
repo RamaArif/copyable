@@ -5,6 +5,7 @@ import 'package:flutter/material.dart'
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_event.dart';
 import '../domain/models/copyable_feedback.dart';
+import '../domain/models/copyable_theme_data.dart';
 import '../domain/models/haptic_feedback_style.dart';
 import '../domain/services/clipboard_service.dart';
 import '../domain/services/haptic_service.dart';
@@ -41,6 +42,22 @@ class CopyHandler {
   /// behaviour on mobile.
   CopyableActionMode resolveMode(CopyableActionMode? explicit) {
     return explicit ?? CopyableActionMode.tap;
+  }
+
+  /// Resolves nullable [SnackBarFeedback] fields against [theme] defaults.
+  ///
+  /// Returns [feedback] unchanged when it is not a [SnackBarFeedback].
+  CopyableFeedback resolveFeedback(
+    CopyableFeedback feedback,
+    CopyableThemeData theme,
+  ) {
+    if (feedback is SnackBarFeedback) {
+      return SnackBarFeedback(
+        text: feedback.text ?? theme.snackBarText,
+        duration: feedback.duration ?? theme.snackBarDuration,
+      );
+    }
+    return feedback;
   }
 
   /// Writes [value] to the clipboard, fires haptic feedback, and executes

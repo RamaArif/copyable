@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_event.dart';
 import '../domain/models/haptic_feedback_style.dart';
+import '_clear_timer_mixin.dart';
 import 'copyable_theme.dart';
 
 /// A fully custom copy widget that exposes an `isCopied` boolean state.
@@ -84,23 +85,26 @@ class CopyableBuilder extends StatefulWidget {
   State<CopyableBuilder> createState() => _CopyableBuilderState();
 }
 
-class _CopyableBuilderState extends State<CopyableBuilder> {
+class _CopyableBuilderState extends State<CopyableBuilder>
+    with ClearAfterMixin<CopyableBuilder> {
   bool _isCopied = false;
+  bool _isCopying = false;
   Timer? _resetTimer;
-  Timer? _clearTimer;
 
   @override
   void dispose() {
     _resetTimer?.cancel();
-    _clearTimer?.cancel();
-    super.dispose();
+    super.dispose(); // ClearAfterMixin.dispose cancels the clear timer
   }
 
   Future<void> _handleCopy() async {
+    if (_isCopying) return;
+    _isCopying = true;
     try {
       await Clipboard.setData(ClipboardData(text: widget.value));
     } catch (e) {
       widget.onError?.call(e);
+      _isCopying = false;
       return;
     }
 
@@ -115,6 +119,8 @@ class _CopyableBuilderState extends State<CopyableBuilder> {
       case HapticFeedbackStyle.selectionClick:
         await HapticFeedback.selectionClick();
     }
+
+    _isCopying = false;
 
     if (!mounted) return;
 
@@ -135,12 +141,7 @@ class _CopyableBuilderState extends State<CopyableBuilder> {
       if (mounted) setState(() => _isCopied = false);
     });
 
-    if (resolvedClearAfter != null) {
-      _clearTimer?.cancel();
-      _clearTimer = Timer(resolvedClearAfter, () {
-        if (mounted) Clipboard.setData(const ClipboardData(text: ''));
-      });
-    }
+    startClearAfterTimer(resolvedClearAfter);
   }
 
   @override

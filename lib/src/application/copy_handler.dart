@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show FlutterError, FlutterErrorDetails;
 import 'package:flutter/material.dart'
     show BuildContext, ScaffoldMessenger, SnackBar, Text, TextAlign;
 
@@ -7,8 +8,8 @@ import '../domain/models/copyable_feedback.dart';
 import '../domain/models/haptic_feedback_style.dart';
 import '../domain/services/clipboard_service.dart';
 import '../domain/services/haptic_service.dart';
-import '../infrastructure/clipboard_service_impl.dart';
-import '../infrastructure/haptic_service_impl.dart';
+import '../data/clipboard_service_impl.dart';
+import '../data/haptic_service_impl.dart';
 
 /// Orchestrates a clipboard copy action.
 ///
@@ -45,6 +46,9 @@ class CopyHandler {
   /// Writes [value] to the clipboard, fires haptic feedback, and executes
   /// the [feedback] strategy.
   ///
+  /// If [onError] is provided and [Clipboard.setData] throws, [onError] is
+  /// called with the error and the method returns early (no haptic, no feedback).
+  ///
   /// Returns immediately if the widget is no longer mounted when async
   /// operations complete.
   Future<void> handle({
@@ -53,8 +57,18 @@ class CopyHandler {
     required CopyableActionMode resolvedMode,
     required CopyableFeedback feedback,
     required HapticFeedbackStyle haptic,
+    void Function(Object)? onError,
   }) async {
-    await _clipboardService.copy(value);
+    try {
+      await _clipboardService.copy(value);
+    } catch (e, st) {
+      if (onError != null) {
+        onError(e);
+      } else {
+        FlutterError.reportError(FlutterErrorDetails(exception: e, stack: st));
+      }
+      return;
+    }
     await _hapticService.perform(haptic);
 
     final event = CopyableEvent(
@@ -76,8 +90,11 @@ class CopyHandler {
       case SnackBarFeedback(:final text, :final duration):
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
-            content: Text(text, textAlign: TextAlign.center),
-            duration: duration,
+            content: Text(
+              text ?? 'Copied!',
+              textAlign: TextAlign.center,
+            ),
+            duration: duration ?? const Duration(seconds: 2),
           ),
         );
       case CustomFeedback(:final onCopied):

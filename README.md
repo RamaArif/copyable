@@ -83,7 +83,7 @@ Row(
 |---|---|---|---|
 | `value` | `String` | required | String written to the clipboard |
 | `child` | `Widget` | required | Widget displayed to the user |
-| `mode` | `CopyableActionMode?` | auto | `tap` or `longPress` (null = auto-detect) |
+| `mode` | `CopyableActionMode?` | `tap` | `tap` or `longPress` (null defaults to `tap` on all platforms) |
 | `feedback` | `CopyableFeedback` | `snackBar()` | What happens after copy |
 | `haptic` | `HapticFeedbackStyle` | `lightImpact` | Haptic style fired after copy |
 | `clearAfter` | `Duration?` | `null` | Clears clipboard after this duration (falls back to `CopyableTheme`) |
@@ -95,6 +95,9 @@ Row(
 |---|---|---|---|
 | `data` | `String` | required | Text string displayed to the user |
 | `value` | `String?` | `null` | String written to the clipboard. When omitted, `data` is copied instead — use this to show a label (e.g. `"Copy card number"`) while copying a different value |
+| `mode` | `CopyableActionMode?` | `tap` | `tap` or `longPress` (null defaults to `tap` on all platforms) |
+| `feedback` | `CopyableFeedback` | `snackBar()` | What happens after copy |
+| `haptic` | `HapticFeedbackStyle` | `lightImpact` | Haptic style fired after copy |
 | `clearAfter` | `Duration?` | `null` | Clears clipboard after this duration (falls back to `CopyableTheme`) |
 | `onError` | `void Function(Object)?` | `null` | Called when `Clipboard.setData` throws |
 

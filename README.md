@@ -34,7 +34,7 @@ GestureDetector(
 
 ```yaml
 dependencies:
-  copyable_widget: ^1.0.0
+  copyable_widget: ^1.2.0
 ```
 
 ```dart
@@ -86,6 +86,8 @@ Row(
 | `mode` | `CopyableActionMode?` | auto | `tap` or `longPress` (null = auto-detect) |
 | `feedback` | `CopyableFeedback` | `snackBar()` | What happens after copy |
 | `haptic` | `HapticFeedbackStyle` | `lightImpact` | Haptic style fired after copy |
+| `clearAfter` | `Duration?` | `null` | Clears clipboard after this duration (falls back to `CopyableTheme`) |
+| `onError` | `void Function(Object)?` | `null` | Called when `Clipboard.setData` throws |
 
 ### `Copyable.text` factory
 
@@ -93,6 +95,8 @@ Row(
 |---|---|---|---|
 | `data` | `String` | required | Text string displayed to the user |
 | `value` | `String?` | `null` | String written to the clipboard. When omitted, `data` is copied instead — use this to show a label (e.g. `"Copy card number"`) while copying a different value |
+| `clearAfter` | `Duration?` | `null` | Clears clipboard after this duration (falls back to `CopyableTheme`) |
+| `onError` | `void Function(Object)?` | `null` | Called when `Clipboard.setData` throws |
 
 Also accepts all standard `Text` parameters (`style`, `textAlign`, `overflow`, `maxLines`, etc.).
 
@@ -183,6 +187,109 @@ Copyable.text(
   mode: CopyableActionMode.longPress,
 )
 ```
+
+---
+
+## CopyableTheme
+
+`CopyableTheme` is an `InheritedWidget` that sets app-wide defaults for all `Copyable` and `CopyableBuilder` widgets. Per-widget values always override theme values.
+
+```dart
+CopyableTheme(
+  data: CopyableThemeData(
+    snackBarText: 'Copied to clipboard',
+    snackBarDuration: Duration(seconds: 3),
+    clearAfter: Duration(seconds: 30), // global secure clear
+  ),
+  child: Scaffold(
+    body: Column(
+      children: [
+        // Uses theme snackBarText and clearAfter automatically
+        Copyable.text('TXN-9182736'),
+        // Per-widget overrides the theme
+        Copyable.text(
+          'Quick copy',
+          feedback: CopyableFeedback.snackBar(text: 'Done!'),
+          clearAfter: Duration(seconds: 5),
+        ),
+      ],
+    ),
+  ),
+)
+```
+
+### `CopyableThemeData`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `snackBarText` | `String` | `'Copied!'` | Default SnackBar message when no per-widget text is set |
+| `snackBarDuration` | `Duration` | `Duration(seconds: 2)` | Default SnackBar duration |
+| `clearAfter` | `Duration?` | `null` | Default clipboard clear delay for all widgets |
+
+---
+
+## clearAfter — Automatic Clipboard Security
+
+For FinTech, crypto, and any app that handles sensitive data, `clearAfter` automatically overwrites the clipboard with an empty string after a specified duration:
+
+```dart
+// Clears clipboard 30 seconds after copy — per widget
+Copyable(
+  value: privateKey,
+  clearAfter: Duration(seconds: 30),
+  child: PrivateKeyCard(...),
+)
+
+// Or set it globally via CopyableTheme
+CopyableTheme(
+  data: CopyableThemeData(clearAfter: Duration(seconds: 30)),
+  child: MyApp(),
+)
+```
+
+---
+
+## CopyableBuilder
+
+`CopyableBuilder` gives you full control over the copy UI by exposing an `isCopied` boolean via a builder function. No SnackBar is shown — you own 100% of the visual feedback.
+
+```dart
+// GitHub-style icon toggle
+CopyableBuilder(
+  value: walletAddress,
+  builder: (context, isCopied) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 200),
+    child: isCopied
+        ? const Icon(Icons.check, key: ValueKey('check'), color: Colors.green)
+        : const Icon(Icons.copy_rounded, key: ValueKey('copy')),
+  ),
+)
+
+// Animated copy button
+CopyableBuilder(
+  value: apiKey,
+  resetAfter: Duration(seconds: 3),
+  clearAfter: Duration(seconds: 60),
+  onCopied: (event) => print('Copied at ${event.timestamp}'),
+  builder: (context, isCopied) => ElevatedButton(
+    onPressed: null, // tap handled by CopyableBuilder
+    child: Text(isCopied ? 'Copied!' : 'Copy API Key'),
+  ),
+)
+```
+
+### `CopyableBuilder` parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `value` | `String` | required | String written to the clipboard |
+| `builder` | `Widget Function(BuildContext, bool)` | required | Builder receiving `isCopied` state |
+| `mode` | `CopyableActionMode?` | `tap` | `tap` or `longPress` |
+| `haptic` | `HapticFeedbackStyle` | `lightImpact` | Haptic style fired after copy |
+| `resetAfter` | `Duration` | `Duration(seconds: 2)` | How long `isCopied` stays `true` |
+| `clearAfter` | `Duration?` | `null` | Clears clipboard after this duration |
+| `onError` | `void Function(Object)?` | `null` | Called when clipboard write fails |
+| `onCopied` | `void Function(CopyableEvent)?` | `null` | Called after successful copy with full event context |
 
 ---
 

@@ -107,6 +107,94 @@ class ExamplePage extends StatelessWidget {
                 'of the row is not interactive.',
             child: _IbanRowIconOnly(iban: _accountNumber),
           ),
+          const SizedBox(height: 24),
+
+          // ── 4. clearAfter ─────────────────────────────────────────────────
+          const _SectionLabel('clearAfter — automatic clipboard security'),
+          const SizedBox(height: 8),
+          _DemoCard(
+            description:
+                'Copies the card number to the clipboard, then clears it '
+                'after 10 seconds. Ideal for FinTech and crypto apps.',
+            child: Copyable.text(
+              'Copy sensitive value',
+              value: _cardNumber,
+              clearAfter: const Duration(seconds: 10),
+              feedback: const CopyableFeedback.snackBar(
+                text: 'Copied! Clipboard clears in 10 s',
+              ),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── 5. onError ───────────────────────────────────────────────────
+          const _SectionLabel('onError — clipboard error handling'),
+          const SizedBox(height: 8),
+          _DemoCard(
+            description:
+                'The onError callback is called if Clipboard.setData throws. '
+                'In this demo the error is printed to the console.',
+            child: Copyable.text(
+              'TXN-9182736',
+              onError: (e) => debugPrint('Clipboard error: $e'),
+              feedback: const CopyableFeedback.snackBar(
+                text: 'Transaction ID copied',
+              ),
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── 6. CopyableTheme ─────────────────────────────────────────────
+          const _SectionLabel('CopyableTheme — app-wide defaults'),
+          const SizedBox(height: 8),
+          _DemoCard(
+            description:
+                'CopyableTheme sets snackBarText, snackBarDuration, and '
+                'clearAfter for all descendants. Per-widget values override '
+                'the theme.',
+            child: CopyableTheme(
+              data: const CopyableThemeData(
+                snackBarText: 'Copied via theme!',
+                snackBarDuration: Duration(seconds: 3),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Copyable.text(
+                    'Uses theme snackBar text',
+                    feedback: const CopyableFeedback.snackBar(),
+                  ),
+                  const SizedBox(height: 8),
+                  Copyable.text(
+                    'Overrides theme text',
+                    feedback: const CopyableFeedback.snackBar(
+                      text: 'Custom override!',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── 7. CopyableBuilder ───────────────────────────────────────────
+          const _SectionLabel('CopyableBuilder — custom isCopied UI'),
+          const SizedBox(height: 8),
+          const _DemoCard(
+            description:
+                'CopyableBuilder exposes an isCopied boolean to build '
+                'fully custom copy UI — GitHub-style icon toggle shown here.',
+            child: _CopyableBuilderDemo(value: _iban),
+          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -194,6 +282,52 @@ class _IbanRowIconOnly extends StatelessWidget {
           value: iban,
           feedback: const CopyableFeedback.snackBar(text: 'IBAN copied!'),
           child: Icon(Icons.copy_rounded, color: cs.outline, size: 18),
+        ),
+      ],
+    );
+  }
+}
+
+class _CopyableBuilderDemo extends StatelessWidget {
+  const _CopyableBuilderDemo({required this.value});
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        CopyableBuilder(
+          value: value,
+          resetAfter: const Duration(seconds: 2),
+          builder: (context, isCopied) => AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: isCopied
+                ? Icon(
+                    Icons.check_rounded,
+                    key: const ValueKey('check'),
+                    color: cs.primary,
+                    size: 20,
+                  )
+                : Icon(
+                    Icons.copy_rounded,
+                    key: const ValueKey('copy'),
+                    color: cs.outline,
+                    size: 20,
+                  ),
+          ),
         ),
       ],
     );

@@ -1,3 +1,12 @@
+## 1.2.0
+
+* **New:** `CopyableBuilder` widget — exposes `isCopied` boolean state via builder function for fully custom copy UI (GitHub-style icon toggle, animated containers, etc.)
+* **New:** `clearAfter` parameter on `Copyable` and `Copyable.text` — automatically overwrites clipboard after a specified duration. Designed for FinTech and crypto apps handling sensitive data.
+* **New:** `CopyableTheme` — `InheritedWidget` for app-wide defaults. Controls `snackBarText`, `snackBarDuration`, and `clearAfter`. Per-widget values always override theme.
+* **New:** `CopyableThemeData` — data class backing `CopyableTheme`.
+* **New:** `onError` callback on `Copyable`, `Copyable.text`, and `CopyableBuilder` — called when `Clipboard.setData` throws, enabling error logging and recovery.
+* **Fix:** `CopyableFeedback.snackBar(text:)` now accepts nullable text — resolves to `CopyableTheme.snackBarText` when not provided.
+
 ## 1.1.0
 
 * `Copyable.text` now accepts an optional `value` parameter — display a label (e.g. `"Copy card number"`) while copying a different string to the clipboard

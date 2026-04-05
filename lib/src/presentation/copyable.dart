@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 
 import '../application/copy_handler.dart';
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_feedback.dart';
 import '../domain/models/haptic_feedback_style.dart';
+import 'copyable_theme.dart';
 
 /// Wraps any widget with clipboard copy behaviour on tap or long-press.
 ///
@@ -52,7 +56,30 @@ import '../domain/models/haptic_feedback_style.dart';
 /// When [mode] is null (default), [CopyableActionMode.tap] is used on all
 /// platforms. Pass [CopyableActionMode.longPress] explicitly if you need
 /// long-press behaviour.
-class Copyable extends StatelessWidget {
+///
+/// **Clear after copy**
+///
+/// Use [clearAfter] to automatically overwrite the clipboard with an empty
+/// string after the specified duration. Ideal for sensitive data:
+/// ```dart
+/// Copyable(
+///   value: privateKey,
+///   clearAfter: Duration(seconds: 30),
+///   child: PrivateKeyCard(...),
+/// )
+/// ```
+///
+/// **Error handling**
+///
+/// Use [onError] to capture clipboard write failures:
+/// ```dart
+/// Copyable(
+///   value: accountNumber,
+///   onError: (e) => logger.error('Clipboard failed', e),
+///   child: AccountRow(...),
+/// )
+/// ```
+class Copyable extends StatefulWidget {
   /// Creates a [Copyable] that wraps [child] and copies [value] to the
   /// clipboard on the resolved gesture.
   const Copyable({
@@ -62,6 +89,8 @@ class Copyable extends StatelessWidget {
     this.mode,
     this.feedback = const SnackBarFeedback(),
     this.haptic = HapticFeedbackStyle.lightImpact,
+    this.clearAfter,
+    this.onError,
   });
 
   /// The string written to the clipboard when the gesture fires.
@@ -85,6 +114,18 @@ class Copyable extends StatelessWidget {
   /// Defaults to [HapticFeedbackStyle.lightImpact]. Silent on platforms
   /// without haptic hardware.
   final HapticFeedbackStyle haptic;
+
+  /// Automatically overwrites the clipboard with an empty string after this
+  /// duration. When null, falls back to [CopyableThemeData.clearAfter].
+  ///
+  /// Designed for FinTech and crypto apps that handle sensitive data.
+  final Duration? clearAfter;
+
+  /// Called when [Clipboard.setData] throws an error.
+  ///
+  /// When provided, no haptic or feedback is triggered on failure.
+  /// Use this for error logging and recovery.
+  final void Function(Object)? onError;
 
   static final _handler = CopyHandler();
 
@@ -117,6 +158,8 @@ class Copyable extends StatelessWidget {
     CopyableActionMode? mode,
     CopyableFeedback feedback = const SnackBarFeedback(),
     HapticFeedbackStyle haptic = HapticFeedbackStyle.lightImpact,
+    Duration? clearAfter,
+    void Function(Object)? onError,
     TextStyle? style,
     StrutStyle? strutStyle,
     TextAlign? textAlign,
@@ -137,6 +180,8 @@ class Copyable extends StatelessWidget {
         mode: mode,
         feedback: feedback,
         haptic: haptic,
+        clearAfter: clearAfter,
+        onError: onError,
         child: Text(
           data,
           style: style,
@@ -156,29 +201,71 @@ class Copyable extends StatelessWidget {
       );
 
   @override
+  State<Copyable> createState() => _CopyableState();
+}
+
+class _CopyableState extends State<Copyable> {
+  Timer? _clearTimer;
+
+  @override
+  void dispose() {
+    _clearTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleCopy(BuildContext context) async {
+    final theme = CopyableTheme.of(context);
+    final resolvedMode = Copyable._handler.resolveMode(widget.mode);
+
+    // Resolve SnackBar text/duration from theme when not provided per-widget.
+    CopyableFeedback resolvedFeedback = widget.feedback;
+    if (widget.feedback is SnackBarFeedback) {
+      final snackFeedback = widget.feedback as SnackBarFeedback;
+      resolvedFeedback = SnackBarFeedback(
+        text: snackFeedback.text ?? theme.snackBarText,
+        duration: snackFeedback.duration ?? theme.snackBarDuration,
+      );
+    }
+
+    // Track whether the copy succeeded so the clear timer is not started
+    // when handle() returns early due to a clipboard error.
+    var copySucceeded = true;
+    await Copyable._handler.handle(
+      context: context,
+      value: widget.value,
+      resolvedMode: resolvedMode,
+      feedback: resolvedFeedback,
+      haptic: widget.haptic,
+      onError: (e) {
+        copySucceeded = false;
+        widget.onError?.call(e);
+      },
+    );
+
+    if (!copySucceeded) return;
+
+    // Start clear timer only after a confirmed successful copy.
+    final resolvedClearAfter = widget.clearAfter ?? theme.clearAfter;
+    if (resolvedClearAfter != null) {
+      _clearTimer?.cancel();
+      _clearTimer = Timer(resolvedClearAfter, () {
+        Clipboard.setData(const ClipboardData(text: ''));
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final resolvedMode = _handler.resolveMode(mode);
+    final resolvedMode = Copyable._handler.resolveMode(widget.mode);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: resolvedMode == CopyableActionMode.tap
-          ? () => _handler.handle(
-                context: context,
-                value: value,
-                resolvedMode: resolvedMode,
-                feedback: feedback,
-                haptic: haptic,
-              )
+          ? () => _handleCopy(context)
           : null,
       onLongPress: resolvedMode == CopyableActionMode.longPress
-          ? () => _handler.handle(
-                context: context,
-                value: value,
-                resolvedMode: resolvedMode,
-                feedback: feedback,
-                haptic: haptic,
-              )
+          ? () => _handleCopy(context)
           : null,
-      child: child,
+      child: widget.child,
     );
   }
 }

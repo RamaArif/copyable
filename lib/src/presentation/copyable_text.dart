@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 
 import '../application/copy_handler.dart';
 import '../domain/models/copyable_action_mode.dart';
 import '../domain/models/copyable_feedback.dart';
 import '../domain/models/haptic_feedback_style.dart';
+import 'copyable_theme.dart';
 
 /// A [Text] widget that copies its content to the clipboard on tap or
 /// long-press.
@@ -26,7 +30,7 @@ import '../domain/models/haptic_feedback_style.dart';
 ///   value: cardNumber,
 /// )
 /// ```
-class CopyableText extends StatelessWidget {
+class CopyableText extends StatefulWidget {
   const CopyableText(
     this.data, {
     super.key,
@@ -34,6 +38,8 @@ class CopyableText extends StatelessWidget {
     this.mode,
     this.feedback = const SnackBarFeedback(),
     this.haptic = HapticFeedbackStyle.lightImpact,
+    this.clearAfter,
+    this.onError,
     this.style,
     this.strutStyle,
     this.textAlign,
@@ -67,6 +73,17 @@ class CopyableText extends StatelessWidget {
   /// The haptic style fired after the clipboard write.
   final HapticFeedbackStyle haptic;
 
+  /// Automatically overwrites the clipboard with an empty string after this
+  /// duration. When null, falls back to [CopyableThemeData.clearAfter].
+  ///
+  /// Designed for FinTech and crypto apps that handle sensitive data.
+  final Duration? clearAfter;
+
+  /// Called when [Clipboard.setData] throws an error.
+  ///
+  /// When provided, no haptic or feedback is triggered on failure.
+  final void Function(Object)? onError;
+
   // ── Text widget parameters ────────────────────────────────────────────────
 
   final TextStyle? style;
@@ -86,43 +103,83 @@ class CopyableText extends StatelessWidget {
   static final _handler = CopyHandler();
 
   @override
+  State<CopyableText> createState() => _CopyableTextState();
+}
+
+class _CopyableTextState extends State<CopyableText> {
+  Timer? _clearTimer;
+
+  @override
+  void dispose() {
+    _clearTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleCopy(BuildContext context) async {
+    final theme = CopyableTheme.of(context);
+    final resolvedMode = CopyableText._handler.resolveMode(widget.mode);
+
+    // Resolve SnackBar text/duration from theme when not provided per-widget.
+    CopyableFeedback resolvedFeedback = widget.feedback;
+    if (widget.feedback is SnackBarFeedback) {
+      final snackFeedback = widget.feedback as SnackBarFeedback;
+      resolvedFeedback = SnackBarFeedback(
+        text: snackFeedback.text ?? theme.snackBarText,
+        duration: snackFeedback.duration ?? theme.snackBarDuration,
+      );
+    }
+
+    var copySucceeded = true;
+    await CopyableText._handler.handle(
+      context: context,
+      value: widget.value ?? widget.data,
+      resolvedMode: resolvedMode,
+      feedback: resolvedFeedback,
+      haptic: widget.haptic,
+      onError: (e) {
+        copySucceeded = false;
+        widget.onError?.call(e);
+      },
+    );
+
+    if (!copySucceeded) return;
+
+    // Start clear timer only after a confirmed successful copy.
+    final resolvedClearAfter = widget.clearAfter ?? theme.clearAfter;
+    if (resolvedClearAfter != null) {
+      _clearTimer?.cancel();
+      _clearTimer = Timer(resolvedClearAfter, () {
+        Clipboard.setData(const ClipboardData(text: ''));
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final resolvedMode = _handler.resolveMode(mode);
+    final resolvedMode = CopyableText._handler.resolveMode(widget.mode);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: resolvedMode == CopyableActionMode.tap
-          ? () => _handler.handle(
-                context: context,
-                value: value ?? data,
-                resolvedMode: resolvedMode,
-                feedback: feedback,
-                haptic: haptic,
-              )
+          ? () => _handleCopy(context)
           : null,
       onLongPress: resolvedMode == CopyableActionMode.longPress
-          ? () => _handler.handle(
-                context: context,
-                value: value ?? data,
-                resolvedMode: resolvedMode,
-                feedback: feedback,
-                haptic: haptic,
-              )
+          ? () => _handleCopy(context)
           : null,
       child: Text(
-        data,
-        style: style,
-        strutStyle: strutStyle,
-        textAlign: textAlign,
-        textDirection: textDirection,
-        locale: locale,
-        softWrap: softWrap,
-        overflow: overflow,
-        textScaler: textScaler,
-        maxLines: maxLines,
-        semanticsLabel: semanticsLabel,
-        textWidthBasis: textWidthBasis,
-        textHeightBehavior: textHeightBehavior,
-        selectionColor: selectionColor,
+        widget.data,
+        style: widget.style,
+        strutStyle: widget.strutStyle,
+        textAlign: widget.textAlign,
+        textDirection: widget.textDirection,
+        locale: widget.locale,
+        softWrap: widget.softWrap,
+        overflow: widget.overflow,
+        textScaler: widget.textScaler,
+        maxLines: widget.maxLines,
+        semanticsLabel: widget.semanticsLabel,
+        textWidthBasis: widget.textWidthBasis,
+        textHeightBehavior: widget.textHeightBehavior,
+        selectionColor: widget.selectionColor,
       ),
     );
   }
